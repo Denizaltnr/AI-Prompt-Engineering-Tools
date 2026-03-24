@@ -8,6 +8,12 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
 
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+  }
+}
+
 const getOidcConfig = memoize(
   async () => {
     return await client.discovery(
@@ -19,7 +25,7 @@ const getOidcConfig = memoize(
 );
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000;
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -57,6 +63,7 @@ async function upsertUser(claims: any) {
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
+    authProvider: "google",
   });
 }
 
@@ -78,10 +85,8 @@ export async function setupAuth(app: Express) {
     verified(null, user);
   };
 
-  // Keep track of registered strategies
   const registeredStrategies = new Set<string>();
 
-  // Helper function to ensure strategy exists for a domain
   const ensureStrategy = (domain: string) => {
     const strategyName = `replitauth:${domain}`;
     if (!registeredStrategies.has(strategyName)) {
@@ -119,21 +124,34 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/logout", (req, res) => {
+    const hasLocalSession = !!(req.session as any).userId;
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+      (req.session as any).userId = undefined;
+      req.session.save(() => {
+        if (hasLocalSession) {
+          res.redirect("/");
+        } else {
+          res.redirect(
+            client.buildEndSessionUrl(config, {
+              client_id: process.env.REPL_ID!,
+              post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+            }).href
+          );
+        }
+      });
     });
   });
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
+  // Check local session first
+  if ((req.session as any).userId) {
+    return next();
+  }
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  // Check OIDC (passport) session
+  const user = req.user as any;
+  if (!req.isAuthenticated() || !user?.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -144,8 +162,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
@@ -153,8 +170,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
     return next();
-  } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+  } catch {
+    return res.status(401).json({ message: "Unauthorized" });
   }
 };
