@@ -3,11 +3,14 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generatePromptSchema, improvePromptSchema, scorePromptSchema, sandboxTestSchema, insertPromptSchema } from "@shared/schema";
 import { generatePrompt, scorePrompt, improvePrompt, simulateAIResponse } from "./prompt-engine";
+import { registerAuthRoutes } from "./replit_integrations/auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  registerAuthRoutes(app);
+
   app.post("/api/generate-prompt", async (req, res) => {
     try {
       const parsed = generatePromptSchema.safeParse(req.body);
