@@ -3,6 +3,14 @@ export type Language = "en" | "tr";
 export const translations = {
   en: {
     appSubtitle: "AI Prompt Tools",
+    auth: {
+      welcomeTitle: "Welcome to PromptForge",
+      welcomeSubtitle: "Sign in to save and manage your prompts",
+      loginWithGoogle: "Continue with Google",
+      termsNote: "By signing in, you agree to our terms of service.",
+      logout: "Sign out",
+      defaultUser: "User",
+    },
     nav: {
       label: "Navigation",
       home: "Home",
@@ -206,6 +214,14 @@ export const translations = {
 
   tr: {
     appSubtitle: "Yapay Zeka Komut Araçları",
+    auth: {
+      welcomeTitle: "PromptForge'a Hoş Geldiniz",
+      welcomeSubtitle: "Komutlarınızı kaydetmek ve yönetmek için giriş yapın",
+      loginWithGoogle: "Google ile Devam Et",
+      termsNote: "Giriş yaparak hizmet koşullarımızı kabul etmiş olursunuz.",
+      logout: "Çıkış Yap",
+      defaultUser: "Kullanıcı",
+    },
     nav: {
       label: "Menü",
       home: "Ana Sayfa",
